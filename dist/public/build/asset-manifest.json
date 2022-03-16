@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/static/css/main.ded77b63.css",
+    "main.js": "/static/js/main.21185f13.js",
+    "static/media/logo_AragoK.png": "/static/media/logo_AragoK.5092a6bd16db10b8dc3b.png",
+    "static/media/logo_AK.png": "/static/media/logo_AK.18ef97bc2542837a908b.png",
+    "index.html": "/index.html",
+    "main.ded77b63.css.map": "/static/css/main.ded77b63.css.map",
+    "main.21185f13.js.map": "/static/js/main.21185f13.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.ded77b63.css",
+    "static/js/main.21185f13.js"
+  ]
+}
