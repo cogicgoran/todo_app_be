@@ -13,7 +13,9 @@ const userSchema = new mongoose.Schema<UserInterface>({
     password: {
         type: String,
         required: true
-    }
+    },
+    resetToken: String,
+    resetTokenExpiration: Date
 });
 
 const userModel = mongoose.model<UserInterface & mongoose.Document>('User', userSchema);

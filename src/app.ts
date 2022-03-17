@@ -8,7 +8,7 @@ import { ControllerInterface } from './Interface/controller.interface';
 import ErrorHandlingMiddleWare from './Http/Middleware/ErrorHandlingMiddleware';
 import { ConnectMongoOptions } from 'connect-mongo/build/main/lib/MongoStore';
 import path from 'path';
-const { NODE_ENV, MONGO_PATH, MONGO_PASSWORD, MONGO_DB_NAME, MONGO_SESSION_COLLECTION_NAME, MONGO_USER, MONGO_URL } = process.env;
+const { NODE_ENV, SESSION_SECRET, MONGO_PATH, MONGO_PASSWORD, MONGO_DB_NAME, MONGO_SESSION_COLLECTION_NAME, MONGO_USER, MONGO_URL } = process.env;
 const CONNECTION_URL = NODE_ENV === 'production' 
 ? `mongodb+srv://${MONGO_USER}:${MONGO_PASSWORD}${MONGO_URL}`
 : MONGO_PATH
@@ -34,7 +34,7 @@ export default class App {
             httpOnly: true,
             maxAge: 1000 * 60 * 60 * 3,
         },
-        secret: 'testSecret',
+        secret: SESSION_SECRET,
         store: MongoStore.create(this.mongoStore),
         resave: true,
         saveUninitialized: false
