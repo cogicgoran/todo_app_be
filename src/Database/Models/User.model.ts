@@ -15,7 +15,8 @@ const userSchema = new mongoose.Schema<UserInterface>({
         required: true
     },
     resetToken: String,
-    resetTokenExpiration: Date
+    resetTokenExpiration: Date,
+    resetTokenTriggered: Boolean
 });
 
 const userModel = mongoose.model<UserInterface & mongoose.Document>('User', userSchema);

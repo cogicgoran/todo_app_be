@@ -12,15 +12,7 @@ import { plainToInstance } from 'class-transformer';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import UserPasswordResetDTO from '../Model/UserResetPassword';
-import UnauthorizedException from '../../Exceptions/auth/UnauthorizedException';
-import nodemailer from 'nodemailer';
-import sendgridTransport from 'nodemailer-sendgrid-transport';
-
-const transporter = nodemailer.createTransport(sendgridTransport({
-    auth: {
-        api_key: process.env.SENDGRID_API_KEY
-    }
-}));
+import MailService from '../Services/sendgrid';
 
 declare module 'express-session' {
     export interface SessionData {
@@ -43,43 +35,70 @@ class AuthController extends Controller implements ControllerInterface {
         this.router.post(`${this.path}/register`, this.validation(UserRegistrationDTO), this.handleRegister);
         this.router.post(`${this.path}/login`, this.validation(UserLoginDTO), this.handleLogin);
         this.router.post(`${this.path}/logout`, this.handleLogout);
-        this.router.post(`${this.path}/password-reset`, this.AuthMiddleware, this.validation(UserPasswordResetDTO), this.resetPassword);
+        this.router.post(`${this.path}/password-reset`, this.validation(UserPasswordResetDTO), this.resetPassword);
+        this.router.post(`${this.path}/password-reset/:tokenId`, this.validation(UserLoginDTO), this.triggerToken)
+    }
+
+    private triggerToken = async (request: Request, response: Response, next: NextFunction) => {
+        const { tokenId } = request.params;
+        console.log("token:", tokenId);
+        
+        const userData: UserLoginDTO = request.body;
+        try {
+            const user = await userModel.findOne({ email: userData.email, resetToken: tokenId, resetTokenExpiration: { $gt: Date.now() } });
+            if (user) {
+                const hashedPassword = await bcrypt.hash(userData.password, this.salt);
+                user.password = hashedPassword;
+                await user.save();
+                return response.status(201).json({status:201, message: "Successfully updated password"});
+            }
+            next(new HttpException(404, 'No token found'));
+
+        } catch (error) {
+            next(new HttpException(500, error.message))
+        }
     }
 
     private resetPassword = async (request: Request, response: Response, next: NextFunction) => {
         const userEmail: UserPasswordResetDTO = request.body;
-        const userSessionId = request.session.user_id;
-        console.log('in reset');
-        
         try {
-            const user = await userModel.findOne({ email: userEmail.email, _id: userSessionId});
-            if(!user) next(new UnauthorizedException());
-            // Send email
-            crypto.randomBytes(32,async (err, buffer) => {
-                if( err) {
-                    console.log(err);
-                    // throw error
-                    const token = buffer.toString();
-                    user.resetToken = token;
-                    user.resetTokenExpiration = new Date(Date.now() + this.RESET_PASWORD_EXPIRATION_TOKEN);
-                    await transporter.sendMail({
-                        to: userEmail.email,
-                        from: 'disshouldntwork99@gmail.com',
-                        subject: 'TodoApp Password Reset',
-                        html:'<h1>Sending email<h1>'
-                    });
+            const user = await userModel.findOne({ email: userEmail.email });
+            if (!user) {
+                const message = `
+                <p>You (or someone) have requested password reset.</p>
+                <p>You don't have an account created.</p>
+                <p>If you haven't requested this password reset. Please ignore this email</p>
+                `
+                await new MailService(userEmail.email, 'Todo App Password Reset', message).send();
+                return response.status(200).send({ status: 200, message: "Email should be sent" });
+            };
 
-                }
+            crypto.randomBytes(32, async (err, buffer) => {
+                if (err) return next(new HttpException(500, 'Error sending email'));
+                // Send email
+                const token = buffer.toString('hex');
+                user.resetToken = token;
+                user.resetTokenExpiration = new Date(Date.now() + this.RESET_PASWORD_EXPIRATION_TOKEN);
+                await user.save();
+                const domain = 'localhost:4040';
+                const resetUrl = `http://${domain}${process.env.API}password-reset/${token}`;
+                const message = `
+                <p>You have requested password reset</p>
+                <p><a href="${resetUrl}">Set your new password</a></p>
+                <p>If you haven't initiated this password reset. Please ignore this email</p>
+                `;
+                await new MailService(userEmail.email, 'Todo App Password Reset', message).send();
+                response.status(200).send({ status: 200, message: "Email should be sent" });
             })
-            response.status(200).send({ status: 200, message: "Email should be sent"});
         } catch (error) {
             next(new HttpException(500, error.message));
         }
     }
 
+
     private validation(type: any): express.RequestHandler {
         return (request, response, next) => {
-            
+
             validate(plainToInstance(type, request.body), { skipMissingProperties: false })
                 .then(errors => {
                     if (errors.length > 0) {
@@ -98,10 +117,10 @@ class AuthController extends Controller implements ControllerInterface {
             const user = await userModel.findOne({ email: userData.email });
             if (!user) return next(new InvalidCredentialsException());
             const comparisonResponse = await bcrypt.compare(userData.password, user.password);
-            if(!comparisonResponse) return next(new InvalidCredentialsException());
+            if (!comparisonResponse) return next(new InvalidCredentialsException());
             request.session.user_id = user._id;
-            response.cookie('user', {username: user.username});
-            response.status(200).send({ status: 200, message: "Successfully logged in!", user:{username: user.username} });
+            response.cookie('user', { username: user.username });
+            response.status(200).send({ status: 200, message: "Successfully logged in!", user: { username: user.username } });
         } catch (error) {
             next(new HttpException(500, error.message));
         }
@@ -125,8 +144,8 @@ class AuthController extends Controller implements ControllerInterface {
             userData.password = await bcrypt.hash(userData.password, this.salt);
             const user = await userModel.create(userData);
             request.session.user_id = user._id;
-            response.cookie('user', {username: userData.username});
-            response.status(201).send({ status: 201, message: "Successfully added user!", user:{username:userData.username} });
+            response.cookie('user', { username: userData.username });
+            response.status(201).send({ status: 201, message: "Successfully added user!", user: { username: userData.username } });
         } catch (error) {
             next(new HttpException(500, error.message));
         }

@@ -4,4 +4,5 @@ export interface UserInterface {
     password: string;
     resetToken?: string;
     resetTokenExpiration?: Date;
+    resetTokenTriggered?: boolean;
 }
